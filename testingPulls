@@ -1,0 +1,1 @@
+I'm trying to understand pulling while local repo has changes I haven't pushed, and vice versa: pushing changes when a remote repo has changes I haven't pulled.
