@@ -927,14 +927,13 @@ void RateLimitManager::UpdateStatus()
 		CurrentStatusUpdate status;
 		if (violation) {
 			status.state = ProgramState::RateLimitViolation;
-			status.message = "RATE LIMIT VIOLATION: retrying in %1 seconds at %2 due to %3";
+			status.message = "VIOLATION: retrying in %1 seconds due to %2";
 		} else {
 			status.state = ProgramState::RateLimitPause;
-			status.message = "RATE LIMIT THROTTLE: waiting %1 seconds until %2 due to %3";
+			status.message = "THROTTLE: waiting %1 seconds due to %2";
 		};
 		status.message = status.message
 			.arg(QDateTime::currentDateTime().secsTo(time))
-			.arg(time.toLocalTime().toString())
 			.arg(policy_name);
 		emit items_worker->StatusUpdate(status);
 	} else {

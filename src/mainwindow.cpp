@@ -405,6 +405,18 @@ void MainWindow::OnStatusUpdate(const CurrentStatusUpdate &status) {
 	case ProgramState::ItemsRetrieved:
 		title = QString("Parsing item mods in tabs, %1/%2").arg(status.progress).arg(status.total);
 		break;
+	case ProgramState::RateLimitPause:
+	case ProgramState::RateLimitViolation:
+		{
+			title = status_bar_label_->text();
+			const qsizetype ratelimit_loc = title.indexOf(" ... RATE LIMIT ");
+			if (ratelimit_loc >= 0)
+			{
+				title.truncate(ratelimit_loc);
+			};
+			title.append(" ... RATE LIMIT " + status.message);
+		};
+		break;
 	default:
 		title = "Unknown";
 	}
