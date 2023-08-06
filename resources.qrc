@@ -1,4 +1,7 @@
 <RCC>
+    <qresource prefix="/">
+	    <file>ratelimits.json</file>
+    </qresource>
     <qresource prefix="/sockets">
         <file alias="I.png">assets/Socket_I.png</file>
         <file alias="D.png">assets/Socket_D.png</file>
