@@ -58,6 +58,7 @@ SOURCES += \
 	src/modsfilter.cpp \
 	src/porting.cpp \
 	src/replytimeout.cpp \
+	src/ratelimit.cpp \
 	src/search.cpp \
 	src/shop.cpp \
 	src/steamlogindialog.cpp \
@@ -105,6 +106,7 @@ HEADERS += \
 	src/modsfilter.h \
 	src/porting.h \
 	src/rapidjson_util.h \
+	src/ratelimit.h \
 	src/replytimeout.h \
 	src/search.h \
 	src/selfdestructingreply.h \

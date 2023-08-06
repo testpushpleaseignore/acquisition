@@ -71,12 +71,15 @@ enum class ProgramState {
 	ShopSubmitting,
 	ShopCompleted,
 	UpdateCancelled,
-	ItemsRetrieved
+	ItemsRetrieved,
+	RateLimitPause,
+	RateLimitViolation
 };
 
 struct CurrentStatusUpdate {
 	ProgramState state;
 	int progress{}, total{}, cached{};
+	QString message;
 };
 
 class MainWindow : public QMainWindow {

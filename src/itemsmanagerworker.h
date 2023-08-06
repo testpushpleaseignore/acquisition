@@ -36,8 +36,8 @@ class QTimer;
 class BuyoutManager;
 class TabCache;
 
-const int kThrottleRequests = 45;
-const int kThrottleSleep = 60;
+const int kThrottleRequests = 10000;
+const int kThrottleSleep = 1;
 const int kMaxCacheSize = (1000*1024*1024); // 1GB
 
 struct ItemsRequest {
@@ -63,10 +63,10 @@ public slots:
 	void ParseItemMods();
 	void Update(TabSelection::Type type, const std::vector<ItemLocation> &tab_names = std::vector<ItemLocation>());
 public slots:
-	void OnMainPageReceived();
-	void OnCharacterListReceived();
-	void OnFirstTabReceived();
-	void OnTabReceived(int index);
+	void OnMainPageReceived(QNetworkReply* reply);
+	void OnCharacterListReceived(QNetworkReply* reply);
+	void OnFirstTabReceived(QNetworkReply* reply);
+	void OnTabReceived(QNetworkReply* reply, int index, ItemLocation location);
 	/*
 	* Makes 45 requests at once, should be called every minute.
 	* These values are approximated (GGG throttles requests)
@@ -76,9 +76,9 @@ public slots:
 	void PreserveSelectedCharacter();
 	void Init();
 
-	void OnStatTranslationsReceived();
-	void OnItemClassesReceived();
-	void OnItemBaseTypesReceived();
+	void OnStatTranslationsReceived(QNetworkReply* reply);
+	void OnItemClassesReceived(QNetworkReply* reply);
+	void OnItemBaseTypesReceived(QNetworkReply* reply);
 signals:
 	void ItemsRefreshed(const Items &items, const std::vector<ItemLocation> &tabs, bool initial_refresh);
 	void StatusUpdate(const CurrentStatusUpdate &status);

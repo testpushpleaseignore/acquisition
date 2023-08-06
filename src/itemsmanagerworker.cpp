@@ -42,6 +42,7 @@
 #include "filesystem.h"
 #include "modlist.h"
 #include "network_info.h"
+#include "ratelimit.h"
 
 const char *kStashItemsUrl = "https://www.pathofexile.com/character-window/get-stash-items";
 const char *kCharacterItemsUrl = "https://www.pathofexile.com/character-window/get-items";
@@ -93,12 +94,14 @@ void ItemsManagerWorker::Init(){
 	updating_ = true;
 
 	QNetworkRequest PoE_item_classes_request = QNetworkRequest(QUrl(QString(kRePoE_item_classes)));
-	QNetworkReply *PoE_item_classes_reply = network_manager_.get(PoE_item_classes_request);
-	connect(PoE_item_classes_reply, &QNetworkReply::finished, this, &ItemsManagerWorker::OnItemClassesReceived);
+	RateLimit::Init(&network_manager_, this);
+	RateLimit::Submit(PoE_item_classes_request,
+		[=](QNetworkReply* reply) {
+			OnItemClassesReceived(reply);
+		});
 }
 
-void ItemsManagerWorker::OnItemClassesReceived(){
-	QNetworkReply *reply = qobject_cast<QNetworkReply *>(QObject::sender());
+void ItemsManagerWorker::OnItemClassesReceived(QNetworkReply *reply){
 
 	if (reply->error()) {
 		QLOG_ERROR() << "Couldn't fetch RePoE Item Classes: " << reply->url().toDisplayString()
@@ -109,12 +112,13 @@ void ItemsManagerWorker::OnItemClassesReceived(){
 	}
 
 	QNetworkRequest PoE_item_base_types_request = QNetworkRequest(QUrl(QString(kRePoE_item_base_types)));
-	QNetworkReply *PoE_item_base_types_reply = network_manager_.get(PoE_item_base_types_request);
-	connect(PoE_item_base_types_reply, &QNetworkReply::finished, this, &ItemsManagerWorker::OnItemBaseTypesReceived);
+	RateLimit::Submit(PoE_item_base_types_request,
+		[=](QNetworkReply* reply) {
+			OnItemBaseTypesReceived(reply);
+		});
 }
 
-void ItemsManagerWorker::OnItemBaseTypesReceived(){
-	QNetworkReply *reply = qobject_cast<QNetworkReply *>(QObject::sender());
+void ItemsManagerWorker::OnItemBaseTypesReceived(QNetworkReply* reply){
 
 	if (reply->error()) {
 		QLOG_ERROR() << "Couldn't fetch RePoE Item Base Types: " << reply->url().toDisplayString()
@@ -218,12 +222,13 @@ void ItemsManagerWorker::UpdateModList(){
 	modsUpdating_ = true;
 
 	QNetworkRequest PoE_stat_translations_request = QNetworkRequest(QUrl(QString(kRePoE_stat_translations)));
-	QNetworkReply *PoE_stats_reply = network_manager_.get(PoE_stat_translations_request);
-	connect(PoE_stats_reply, &QNetworkReply::finished, this, &ItemsManagerWorker::OnStatTranslationsReceived);
+	RateLimit::Submit(PoE_stat_translations_request,
+		[=](QNetworkReply* reply) {
+			OnStatTranslationsReceived(reply);
+		});
 }
 
-void ItemsManagerWorker::OnStatTranslationsReceived(){
-	QNetworkReply *reply = qobject_cast<QNetworkReply *>(QObject::sender());
+void ItemsManagerWorker::OnStatTranslationsReceived(QNetworkReply* reply){
 
 	if (reply->error()) {
 		QLOG_ERROR() << "Couldn't fetch RePoE Stat Translations: " << reply->url().toDisplayString()
@@ -316,12 +321,13 @@ void ItemsManagerWorker::Update(TabSelection::Type type, const std::vector<ItemL
 	// first, download the main page because it's the only way to know which character is selected
 	QNetworkRequest main_page_request = Request(QUrl(kMainPage), ItemLocation(), TabCache::Refresh);
 	main_page_request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, USER_AGENT);
-	QNetworkReply *main_page = network_manager_.get(main_page_request);
-	connect(main_page, &QNetworkReply::finished, this, &ItemsManagerWorker::OnMainPageReceived);
+	RateLimit::Submit(main_page_request,
+		[=](QNetworkReply* reply) {
+            OnMainPageReceived(reply);
+        });
 }
 
-void ItemsManagerWorker::OnMainPageReceived() {
-	QNetworkReply *reply = qobject_cast<QNetworkReply *>(QObject::sender());
+void ItemsManagerWorker::OnMainPageReceived(QNetworkReply* reply) {
 
 	if (reply->error()) {
 		QLOG_WARN() << "Couldn't fetch main page: " << reply->url().toDisplayString() << " due to error: " << reply->errorString();
@@ -337,14 +343,15 @@ void ItemsManagerWorker::OnMainPageReceived() {
 	// now get character list
 	QNetworkRequest characters_request = Request(QUrl(kGetCharactersUrl), ItemLocation(), TabCache::Refresh);
 	characters_request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, USER_AGENT);
-	QNetworkReply *characters = network_manager_.get(characters_request);
-	connect(characters, &QNetworkReply::finished, this, &ItemsManagerWorker::OnCharacterListReceived);
+	RateLimit::Submit(characters_request,
+		[=](QNetworkReply* reply) {
+			OnCharacterListReceived(reply);
+		});
 
 	reply->deleteLater();
 }
 
-void ItemsManagerWorker::OnCharacterListReceived() {
-	QNetworkReply *reply = qobject_cast<QNetworkReply *>(QObject::sender());
+void ItemsManagerWorker::OnCharacterListReceived(QNetworkReply* reply) {
 	QByteArray bytes = reply->readAll();
 	rapidjson::Document doc;
 	doc.Parse(bytes.constData());
@@ -437,8 +444,13 @@ void ItemsManagerWorker::OnCharacterListReceived() {
 		}
 	}
 
-	QNetworkReply *first_tab = network_manager_.get(MakeTabRequest(tabToReq.get_tab_id(), ItemLocation(), true, true));
-	connect(first_tab, SIGNAL(finished()), this, SLOT(OnFirstTabReceived()));
+	QNetworkRequest tab_request = MakeTabRequest(tabToReq.get_tab_id(), ItemLocation(), true, true);
+
+	RateLimit::Submit(tab_request,
+		[=](QNetworkReply* reply) {
+			OnFirstTabReceived(reply);
+		});
+	
 	reply->deleteLater();
 }
 
@@ -517,12 +529,16 @@ void ItemsManagerWorker::FetchItems(int limit) {
 
 		QNetworkRequest fetch_request = request.network_request;
 		fetch_request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, USER_AGENT);
-		QNetworkReply *fetched = network_manager_.get(fetch_request);
-		signal_mapper_->setMapping(fetched, request.id);
-		connect(fetched, SIGNAL(finished()), signal_mapper_, SLOT(map()));
+		int id = request.id;
+		ItemLocation location = request.location;
+		RateLimit::Submit(fetch_request,
+			[=](QNetworkReply* reply) {
+				OnTabReceived(reply, id, location);
+			});
+
 
 		ItemsReply reply;
-		reply.network_reply = fetched;
+		reply.network_reply = nullptr;
 		reply.request = request;
 		replies_[request.id] = reply;
 
@@ -534,8 +550,7 @@ void ItemsManagerWorker::FetchItems(int limit) {
 	cached_requests_completed_ = 0;
 }
 
-void ItemsManagerWorker::OnFirstTabReceived() {
-	QNetworkReply *reply = qobject_cast<QNetworkReply *>(QObject::sender());
+void ItemsManagerWorker::OnFirstTabReceived(QNetworkReply* reply) {
 	QByteArray bytes = reply->readAll();
 	rapidjson::Document doc;
 	doc.Parse(bytes.constData());
@@ -615,7 +630,6 @@ void ItemsManagerWorker::OnFirstTabReceived() {
 
 	FetchItems(kThrottleRequests - 1);
 
-	connect(signal_mapper_, SIGNAL(mapped(int)), this, SLOT(OnTabReceived(int)));
 	reply->deleteLater();
 }
 
@@ -639,25 +653,21 @@ void ItemsManagerWorker::ParseItems(rapidjson::Value *value_ptr, ItemLocation ba
 	}
 }
 
-void ItemsManagerWorker::OnTabReceived(int request_id) {
-	if (!replies_.count(request_id)) {
-		QLOG_WARN() << "Received a reply for request" << request_id << "that was not requested.";
-		return;
-	}
+void ItemsManagerWorker::OnTabReceived(QNetworkReply* network_reply, int request_id, ItemLocation location) {
 
-	ItemsReply reply = replies_[request_id];
-
-	bool reply_from_cache = reply.network_reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute).toBool();
+	bool reply_from_cache = network_reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute).toBool();
 
 	if (reply_from_cache) {
-		QLOG_DEBUG() << "Received a cached reply for" << reply.request.location.GetHeader().c_str();
+		QLOG_DEBUG() << "Received a cached reply for" << location.GetHeader().c_str();
 		++cached_requests_completed_;
 		++total_cached_;
 	} else {
-		QLOG_DEBUG() << "Received a reply for" << reply.request.location.GetHeader().c_str();
+
+		QLOG_DEBUG() << "Received a reply for" << location.GetHeader().c_str();
 	}
 
-	QByteArray bytes = reply.network_reply->readAll();
+
+	QByteArray bytes = network_reply->readAll();
 	rapidjson::Document doc;
 	doc.Parse(bytes.constData());
 
@@ -674,23 +684,27 @@ void ItemsManagerWorker::OnTabReceived(int request_id) {
 	// We index expected tabs and their locations as part of the first fetch.  It's possible for users
 	// to move or rename tabs during the update which will result in the item data being out-of-sync with
 	// expected index/tab name map.  We need to detect this case and abort the update.
-	if (!cancel_update_ && !error && (reply.request.location.get_type() == ItemLocationType::STASH)) {
+
+	if (!cancel_update_ && !error && (location.get_type() == ItemLocationType::STASH)) {
 		if (!doc.HasMember("tabs") || doc["tabs"].Size() == 0) {
 			QLOG_ERROR() << "Full tab information missing from stash tab fetch.  Cancelling update. Full fetch URL: "
-						 << reply.request.network_request.url().toDisplayString();
+						 << network_reply->request().url().toDisplayString();
+
 			cancel_update_ = true;
 		} else {
 			std::string tabs_as_string = Util::RapidjsonSerialize(doc["tabs"]);
 			auto tabs_signature_current = CreateTabsSignatureVector(tabs_as_string);
 
-			auto tab_id = reply.request.location.get_tab_id();
+
+			auto tab_id = location.get_tab_id();
 			if (tabs_signature_[tab_id] != tabs_signature_current[tab_id]) {
 				if (reply_from_cache) {
 					// Here we unexpectedly are seeing a cached document that is out-of-sync with current tab state
 					// This is not fatal but unexpected as we shouldn't get here if everything else is done right.
 					// If we do see, set 'error' condition which causes us to flush from catch and re-fetch from server.
 					QLOG_WARN() << "Unexpected hit on stale cached tab.  Flushing and re-fetching request: "
-								<< reply.request.network_request.url().toDisplayString();
+								<< network_reply->request().url().toDisplayString();
+
 					error = true;
 					// Isn't really cached since we're erroring out and replaying so fix up stats
 					total_cached_--;
@@ -710,7 +724,8 @@ void ItemsManagerWorker::OnTabReceived(int request_id) {
 
 					QLOG_ERROR() << "You renamed or re-ordered tabs in game while acquisition was in the middle of the update,"
 								 << " aborting to prevent synchronization problems and pricing data loss. Mismatch reason(s) -> "
-								 << reason.c_str() << ". For request: " << reply.request.network_request.url().toDisplayString();
+								 << reason.c_str() << ". For request: " << network_reply->request().url().toDisplayString();
+
 					cancel_update_ = true;
 				}
 			}
@@ -721,8 +736,8 @@ void ItemsManagerWorker::OnTabReceived(int request_id) {
 	if (error) {
 		// We can 'cache' error response document so make sure we remove it
 		// before reque
-		tab_cache_->remove(reply.request.network_request.url());
-		QueueRequest(reply.request.network_request, reply.request.location);
+		tab_cache_->remove(network_reply->request().url());
+		QueueRequest(network_reply->request(), location);
 	}
 
 	++requests_completed_;
@@ -762,7 +777,8 @@ void ItemsManagerWorker::OnTabReceived(int request_id) {
 	if (error)
 		return;
 
-	ParseItems(&doc["items"], reply.request.location, doc.GetAllocator());
+
+	ParseItems(&doc["items"], location, doc.GetAllocator());
 
 	if ((total_completed_ == total_needed_) && !cancel_update_) {
 		// It's possible that we receive character vs stash tabs out of order, or users
@@ -814,13 +830,15 @@ void ItemsManagerWorker::OnTabReceived(int request_id) {
 			PreserveSelectedCharacter();
 	}
 
-	reply.network_reply->deleteLater();
+
+	network_reply->deleteLater();
 }
 
 void ItemsManagerWorker::PreserveSelectedCharacter() {
 	if (selected_character_.empty())
 		return;
-	network_manager_.get(MakeCharacterRequest(selected_character_, ItemLocation()));
+	QNetworkRequest character_request = MakeCharacterRequest(selected_character_, ItemLocation());
+	RateLimit::Submit(character_request, [](QNetworkReply*) {});
 }
 
 

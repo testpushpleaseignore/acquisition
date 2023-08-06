@@ -1,0 +1,14 @@
+[
+{
+	"policy-name" : "backend-character-request-limit",
+	"policy-endpoints" : [
+		"/character-window/get-characters",
+		"/character-window/get-passive-skills"]
+},
+{
+	"policy-name" : "backend-item-request-limit",
+	"policy-endpoints" : [
+		"/character-window/get-items",
+		"/character-window/get-stash-items"]
+}
+]
