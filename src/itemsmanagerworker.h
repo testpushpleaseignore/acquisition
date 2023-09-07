@@ -36,8 +36,8 @@ class QTimer;
 class BuyoutManager;
 class TabCache;
 
-const int kThrottleRequests = 45;
-const int kThrottleSleep = 60;
+const int kThrottleRequests = 5;
+const int kThrottleSleep = 70;
 const int kMaxCacheSize = (1000*1024*1024); // 1GB
 
 struct ItemsRequest {
