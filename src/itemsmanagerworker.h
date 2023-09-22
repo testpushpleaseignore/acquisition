@@ -36,8 +36,11 @@ class QTimer;
 class BuyoutManager;
 class TabCache;
 
-const int kThrottleRequests = 45;
+const int kThrottleRequests = 30;
 const int kThrottleSleep = 60;
+const int maxThrottleRequests = 4;
+const int maxThrottleSleep = 1900;
+
 const int kMaxCacheSize = (1000*1024*1024); // 1GB
 
 struct ItemsRequest {
@@ -68,7 +71,7 @@ public slots:
 	void OnFirstTabReceived();
 	void OnTabReceived(int index);
 	/*
-	* Makes 45 requests at once, should be called every minute.
+	* Makes 30 requests at once, should be called every minute.
 	* These values are approximated (GGG throttles requests)
 	* based on some quick testing.
 	*/
@@ -105,7 +108,7 @@ private:
 	std::vector<std::pair<std::string, std::string> > tabs_signature_;
 	bool cancel_update_{false};
 	Items items_;
-	int total_completed_, total_needed_, total_cached_;
+	int total_completed_, total_needed_, total_cached_, total_pre_throttle_;
 	int requests_completed_, requests_needed_;
 	int cached_requests_completed_{0};
 

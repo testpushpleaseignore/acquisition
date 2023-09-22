@@ -727,6 +727,7 @@ void ItemsManagerWorker::OnTabReceived(int request_id) {
 
 	++requests_completed_;
 
+	
 	if (!error)
 		++total_completed_;
 
@@ -735,16 +736,30 @@ void ItemsManagerWorker::OnTabReceived(int request_id) {
 	if (requests_completed_ == requests_needed_) {
 		if (cancel_update_) {
 			updating_ = false;
-		} else if (queue_.size() > 0) {
+		} 
+		
+		else if (queue_.size() > 0) {
+
 			if (cached_requests_completed_ > 0) {
 				// We basically don't want cached requests to count against throttle limit
 				// so if we did get any cached requests fetch up to that number without a
 				// large delay
 				QTimer::singleShot(1, [&]() { FetchItems(cached_requests_completed_); });
-			} else {
-				throttled = true;
-				QLOG_DEBUG() << "Sleeping one minute to prevent throttling.";
-				QTimer::singleShot(kThrottleSleep * 1000, this, SLOT(FetchItems()));
+			} 
+			
+			else {
+				++total_pre_throttle_;
+
+				if(total_pre_throttle_ > maxThrottleRequests) {
+					QLOG_DEBUG() << "Sleeping thirty minutes to prevent throttling.";
+					total_pre_throttle_ = 0;
+					QTimer::singleShot(maxThrottleSleep * 1000, this, SLOT(FetchItems()));
+				} else {
+					throttled = true;
+					QLOG_DEBUG() << "Sleeping one minute to prevent throttling.";
+					QTimer::singleShot(kThrottleSleep * 1000, this, SLOT(FetchItems()));
+				}
+
 			}
 		}
 	}
